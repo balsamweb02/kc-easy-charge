@@ -31,14 +31,21 @@
   const nav    = $('#nav');
   const closeMenu = () => {
     nav.classList.remove('is-open');
+    document.body.classList.remove('menu-open');
     burger.setAttribute('aria-expanded', 'false');
   };
   burger.addEventListener('click', () => {
     const open = nav.classList.toggle('is-open');
+    document.body.classList.toggle('menu-open', open);
     burger.setAttribute('aria-expanded', String(open));
   });
   $$('a', nav).forEach(a => a.addEventListener('click', closeMenu));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  // tap outside the menu (on the dimmed page) closes it
+  document.addEventListener('click', e => {
+    if (nav.classList.contains('is-open') && !nav.contains(e.target) && !burger.contains(e.target)) closeMenu();
+  });
+  window.addEventListener('resize', () => { if (window.innerWidth > 900) closeMenu(); });
 
   /* ---- Active nav link on scroll ----------------------------- */
   const links = $$('.nav__link:not([data-nospy])');
@@ -163,11 +170,53 @@
     form.reset();
   });
 
-  /* ---- Parallax photos ----------------------------------------- */
-const par=$$('[data-parallax]');
-if(par.length&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
-  window.addEventListener('scroll',()=>par.forEach(p=>{const r=p.parentElement.getBoundingClientRect();p.style.transform=`translateY(${(r.top*-0.12).toFixed(1)}px) scale(1.15)`;}),{passive:true});
-}
+  /* ---- Parallax photos (desktop mouse devices only) ----------- */
+  const par = $$('[data-parallax]');
+  if (par.length) {
+    const canParallax = () =>
+      matchMedia('(min-width: 901px) and (hover: hover)').matches &&
+      !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const on = canParallax();
+      par.forEach(p => {
+        if (!on) { p.style.transform = ''; return; }
+        const r = p.parentElement.getBoundingClientRect();
+        p.style.transform = `translateY(${(r.top * -0.12).toFixed(1)}px) scale(1.15)`;
+      });
+    };
+    window.addEventListener('scroll', () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
+
+  /* ---- Services carousel dots (phones) ------------------------- */
+  const track = $('.solutions');
+  if (track) {
+    const cards = $$('.sol', track);
+    const dots = document.createElement('div');
+    dots.className = 'dots';
+    dots.setAttribute('aria-hidden', 'true');
+    cards.forEach(() => dots.appendChild(document.createElement('i')));
+    track.after(dots);
+    const dotEls = $$('i', dots);
+    const setDot = () => {
+      const left = track.getBoundingClientRect().left;
+      let best = 0, min = Infinity;
+      cards.forEach((c, i) => {
+        const d = Math.abs(c.getBoundingClientRect().left - left);
+        if (d < min) { min = d; best = i; }
+      });
+      if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 4) best = cards.length - 1;
+      dotEls.forEach((d, i) => d.classList.toggle('is-on', i === best));
+    };
+    track.addEventListener('scroll', () => requestAnimationFrame(setDot), { passive: true });
+    window.addEventListener('resize', setDot);
+    setDot();
+  }
 
 /* ---- Footer year ------------------------------------------- */
   $('#year').textContent = new Date().getFullYear();
